@@ -93,11 +93,13 @@
 
         // --- UI Components ---
         const Icon = ({ name, size = 18, className }) => {
-            useEffect(() => { lucide.createIcons(); }, [name, size]);
+            useEffect(() => { 
+                if (window.lucide) window.lucide.createIcons(); 
+            }, [name, size]);
             return <i data-lucide={name} style={{ width: size, height: size }} className={className}></i>;
         };
 
-        const Badge = ({ status, priority }) => {
+        const Badge = ({ status, priority, children }) => {
             const getStyles = () => {
                 if (status === 'DONE') return "bg-emerald-500/10 text-emerald-500 border-emerald-500/20";
                 if (status === 'IN_PROGRESS') return "bg-blue-500/10 text-blue-500 border-blue-500/20";
@@ -107,7 +109,7 @@
             };
             return (
                 <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-widest border ${getStyles()}`}>
-                    {status || priority}
+                    {children || status || priority}
                 </span>
             );
         };
@@ -160,7 +162,7 @@
                     >
                         <div>
                             <p className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">Active Projects</p>
-                            <h2 className="text-4xl font-black mt-1 dark:text-white">{data.projects.length}</h2>
+                            <h2 className="text-4xl font-black mt-1 dark:text-white">{data.projects?.length || 0}</h2>
                         </div>
                         <div className="bg-primary/10 p-3 rounded-2xl text-primary"><Icon name="folder" size={24}/></div>
                     </Card>
@@ -170,7 +172,7 @@
                     >
                         <div>
                             <p className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">Open Tasks</p>
-                            <h2 className="text-4xl font-black mt-1 dark:text-white">{data.tasks.filter(t => t.status !== 'DONE').length}</h2>
+                            <h2 className="text-4xl font-black mt-1 dark:text-white">{data.tasks?.filter(t => t.status !== 'DONE').length || 0}</h2>
                         </div>
                         <div className="bg-amber-500/10 p-3 rounded-2xl text-amber-500"><Icon name="clock" size={24}/></div>
                     </Card>
@@ -180,7 +182,7 @@
                     >
                         <div>
                             <p className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">Completed</p>
-                            <h2 className="text-4xl font-black mt-1 dark:text-white">{data.tasks.filter(t => t.status === 'DONE').length}</h2>
+                            <h2 className="text-4xl font-black mt-1 dark:text-white">{data.tasks?.filter(t => t.status === 'DONE').length || 0}</h2>
                         </div>
                         <div className="bg-emerald-500/10 p-3 rounded-2xl text-emerald-500"><Icon name="check-circle" size={24}/></div>
                     </Card>
@@ -190,7 +192,7 @@
                     <Card>
                         <h3 className="font-bold text-lg mb-6 dark:text-white">Project Progress</h3>
                         <div className="space-y-6">
-                            {data.projects.map(p => (
+                            {(data.projects || []).map(p => (
                                 <div key={p.id} className="space-y-2">
                                     <div className="flex justify-between items-center text-xs">
                                         <div className="flex items-center gap-2 font-bold">
@@ -209,7 +211,7 @@
                     <Card>
                         <h3 className="font-bold text-lg mb-6 dark:text-white">Recent Activity</h3>
                         <div className="space-y-4">
-                            {data.tasks.slice(0, 4).map(t => (
+                            {(data.tasks || []).slice(0, 4).map(t => (
                                 <div key={t.id} className="flex items-center justify-between p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/30">
                                     <div className="flex items-center gap-3">
                                         <div className="w-8 h-8 rounded-full bg-white dark:bg-slate-900 border dark:border-slate-700 flex items-center justify-center font-bold text-[10px] text-primary">
@@ -231,7 +233,7 @@
 
         const Workspaces = ({ data, onSelect }) => (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8 animate-in">
-                {data.projects.map(p => (
+                {(data.projects || []).map(p => (
                     <Card key={p.id} className="border-t-[6px] group" style={{borderTopColor: p.color}} onClick={() => onSelect(p)}>
                         <div className="flex justify-between items-start mb-4">
                             <h3 className="font-black text-2xl dark:text-white group-hover:text-primary transition-colors">{p.name}</h3>
@@ -384,6 +386,8 @@
             const [selectedProject, setSelectedProject] = useState(null);
             const [isDark, setIsDark] = useState(true);
             const [isProjectModalOpen, setIsProjectModalOpen] = useState(false);
+            const [isSyncing, setIsSyncing] = useState(false);
+            const [connError, setConnError] = useState(false);
             
             // App Data State
             const [data, setData] = useState(INITIAL_DATA);
@@ -391,21 +395,76 @@
             // Project Creation State
             const [newProject, setNewProject] = useState({ name: '', description: '', color: PROJECT_COLORS[0] });
 
+            // Fetch initial data from Google Sheet
+            const fetchSheetData = async () => {
+                setIsSyncing(true);
+                setConnError(false);
+                try {
+                    const response = await fetch(APPS_SCRIPT_URL, {
+                        method: 'GET',
+                        cache: 'no-cache',
+                    });
+                    if (response.ok) {
+                        const result = await response.json();
+                        if (result && result.projects) {
+                            setData(result);
+                        }
+                    } else {
+                        throw new Error('Connection failed');
+                    }
+                } catch (error) {
+                    console.error("Failed to fetch sheet data:", error);
+                    setConnError(true);
+                } finally {
+                    setIsSyncing(false);
+                }
+            };
+
+            useEffect(() => {
+                if (user) fetchSheetData();
+            }, [user]);
+
             useEffect(() => {
                 if (isDark) document.documentElement.classList.add('dark');
                 else document.documentElement.classList.remove('dark');
             }, [isDark]);
 
-            const handleCreateProject = () => {
+            // Save entire state back to sheet
+            const saveToSheet = async (updatedData) => {
+                setIsSyncing(true);
+                try {
+                    // Using standard fetch with no-cors for Google Apps Script POST
+                    await fetch(APPS_SCRIPT_URL, {
+                        method: "POST",
+                        mode: "no-cors",
+                        cache: "no-cache",
+                        headers: {
+                            "Content-Type": "application/json",
+                        },
+                        body: JSON.stringify(updatedData),
+                    });
+                } catch (error) {
+                    console.error("Failed to save to sheet:", error);
+                } finally {
+                    setTimeout(() => setIsSyncing(false), 1500);
+                }
+            };
+
+            const handleCreateProject = async () => {
                 if (!newProject.name) return;
                 const project = {
                     ...newProject,
                     id: `p-${Date.now()}`,
                     ownerId: user.id
                 };
-                setData(prev => ({ ...prev, projects: [...prev.projects, project] }));
+                
+                const updatedData = { ...data, projects: [...(data.projects || []), project] };
+                setData(updatedData);
                 setIsProjectModalOpen(false);
                 setNewProject({ name: '', description: '', color: PROJECT_COLORS[0] });
+                
+                // Trigger background save
+                await saveToSheet(updatedData);
             };
 
             if (!user) {
@@ -446,7 +505,7 @@
 
             return (
                 <div className="flex h-screen overflow-hidden bg-slate-50 dark:bg-slate-950">
-                    {/* Sidebar - Slimmer width w-60 */}
+                    {/* Sidebar */}
                     <aside className="w-60 border-r border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/50 h-full flex flex-col p-6 shrink-0 relative z-20">
                         <div className="flex items-center justify-between mb-10 px-1">
                             <div className="flex items-center gap-3">
@@ -486,6 +545,22 @@
                         </nav>
 
                         <div className="mt-auto pt-6 border-t dark:border-slate-800">
+                            {isSyncing ? (
+                                <div className="flex items-center gap-2 mb-4 px-1 text-[10px] font-bold text-slate-400 animate-pulse">
+                                    <div className="w-1.5 h-1.5 rounded-full bg-primary"></div>
+                                    Syncing...
+                                </div>
+                            ) : connError ? (
+                                <button onClick={fetchSheetData} className="flex items-center gap-2 mb-4 px-1 text-[10px] font-bold text-rose-500 hover:underline">
+                                    <div className="w-1.5 h-1.5 rounded-full bg-rose-500"></div>
+                                    Connection Error (Retry?)
+                                </button>
+                            ) : (
+                                <div className="flex items-center gap-2 mb-4 px-1 text-[10px] font-bold text-emerald-500">
+                                    <div className="w-1.5 h-1.5 rounded-full bg-emerald-500"></div>
+                                    Live Connection
+                                </div>
+                            )}
                             <div className="flex items-center gap-3 mb-5 px-1">
                                 <div className="w-9 h-9 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center font-black text-primary border dark:border-slate-700 shrink-0">
                                     {user.name[0]}
@@ -528,7 +603,7 @@
                                     transition={{ duration: 0.2 }}
                                 >
                                     {selectedProject ? (
-                                        <ProjectDetail project={selectedProject} tasks={data.tasks} users={data.users} onBack={() => setSelectedProject(null)} />
+                                        <ProjectDetail project={selectedProject} tasks={data.tasks || []} users={data.users || []} onBack={() => setSelectedProject(null)} />
                                     ) : (
                                         <>
                                             {activeTab === 'dashboard' && <Dashboard data={data} onNavigate={setActiveTab} />}
@@ -545,8 +620,8 @@
                                                             </tr>
                                                         </thead>
                                                         <tbody className="divide-y dark:divide-slate-800">
-                                                            {data.tasks.map(t => {
-                                                                const project = data.projects.find(p => p.id === t.projectId);
+                                                            {(data.tasks || []).map(t => {
+                                                                const project = data.projects?.find(p => p.id === t.projectId);
                                                                 return (
                                                                     <tr key={t.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group">
                                                                         <td className="px-8 py-5 text-sm font-bold dark:text-slate-100 flex items-center gap-4">
@@ -554,7 +629,7 @@
                                                                             {t.title}
                                                                         </td>
                                                                         <td className="px-8 py-5 text-xs font-bold" style={{ color: project?.color }}>
-                                                                            {project?.name}
+                                                                            {project?.name || 'Unknown'}
                                                                         </td>
                                                                         <td className="px-8 py-5"><Badge status={t.status} /></td>
                                                                         <td className="px-8 py-5"><Badge priority={t.priority} /></td>
@@ -568,9 +643,12 @@
                                             {activeTab === 'admin' && (
                                                 <div className="space-y-8">
                                                     <Card>
-                                                        <h3 className="font-bold text-lg mb-6 dark:text-white">Active Team Members</h3>
+                                                        <div className="flex justify-between items-center mb-6">
+                                                            <h3 className="font-bold text-lg dark:text-white">Active Team Members</h3>
+                                                            <button onClick={fetchSheetData} className="text-[10px] font-black uppercase text-primary hover:underline">Refresh Data</button>
+                                                        </div>
                                                         <div className="space-y-4">
-                                                            {data.users.map(u => (
+                                                            {(data.users || []).map(u => (
                                                                 <div key={u.id} className="flex justify-between items-center p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/30">
                                                                     <div className="flex items-center gap-4">
                                                                         <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center font-black text-primary">
@@ -586,6 +664,21 @@
                                                             ))}
                                                         </div>
                                                     </Card>
+                                                    
+                                                    {connError && (
+                                                        <div className="p-6 bg-rose-500/10 border border-rose-500/20 rounded-3xl">
+                                                            <div className="flex gap-4">
+                                                                <Icon name="alert-triangle" className="text-rose-500" />
+                                                                <div>
+                                                                    <h4 className="font-bold text-rose-500">Sheet Sync Failed</h4>
+                                                                    <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+                                                                        Ensure your Apps Script is deployed as a Web App with access set to "Anyone". 
+                                                                        Current URL: <span className="font-mono text-xs break-all opacity-60">{APPS_SCRIPT_URL}</span>
+                                                                    </p>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    )}
                                                 </div>
                                             )}
                                         </>
@@ -633,9 +726,10 @@
                             </div>
                             <button 
                                 onClick={handleCreateProject}
-                                className="w-full bg-primary text-white py-4 rounded-3xl font-black text-sm shadow-xl shadow-primary/20 hover:opacity-90 transition-all mt-4"
+                                disabled={isSyncing}
+                                className="w-full bg-primary text-white py-4 rounded-3xl font-black text-sm shadow-xl shadow-primary/20 hover:opacity-90 disabled:opacity-50 transition-all mt-4"
                             >
-                                Confirm & Create Project
+                                {isSyncing ? 'Creating...' : 'Confirm & Create Project'}
                             </button>
                         </div>
                     </Modal>
