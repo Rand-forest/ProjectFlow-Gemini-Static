@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ProjectFlow | Static Edition</title>
+    <title>ProjectFlow | Google Sheets Edition</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
@@ -11,537 +11,98 @@
     <script src="https://unpkg.com/lucide@latest"></script>
     <script src="https://unpkg.com/framer-motion@10.16.4/dist/framer-motion.js"></script>
     <script src="https://unpkg.com/clsx@2.0.0/dist/clsx.min.js"></script>
-    <script src="https://unpkg.com/tailwind-merge@1.14.0/dist/bundle-client.umd.js"></script>
-    
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
-        :root { --font-sans: 'Inter', sans-serif; }
-        body { font-family: var(--font-sans); }
-        .hero-gradient {
-            background: radial-gradient(circle at top left, rgba(124, 58, 237, 0.08), transparent),
-                        radial-gradient(circle at bottom right, rgba(37, 99, 235, 0.08), transparent);
-        }
-        .gantt-grid-lines {
-            background-size: 40px 100%;
-            background-image: linear-gradient(to right, rgba(0,0,0,0.05) 1px, transparent 1px);
-        }
-        ::-webkit-scrollbar { width: 6px; height: 6px; }
-        ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
-        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        body { font-family: 'Inter', sans-serif; }
+        .hero-gradient { background: radial-gradient(circle at top left, rgba(124, 58, 237, 0.08), transparent), radial-gradient(circle at bottom right, rgba(37, 99, 235, 0.08), transparent); }
     </style>
-    
-    <script>
-        tailwind.config = {
-            darkMode: 'class',
-            theme: {
-                extend: {
-                    colors: {
-                        border: "hsl(214.3 31.8% 91.4%)",
-                        input: "hsl(214.3 31.8% 91.4%)",
-                        ring: "hsl(222.2 84% 4.9%)",
-                        background: "hsl(0 0% 100%)",
-                        foreground: "hsl(222.2 84% 4.9%)",
-                        primary: { DEFAULT: "#7C3AED", foreground: "#ffffff" },
-                        secondary: { DEFAULT: "hsl(210 40% 96.1%)", foreground: "hsl(222.2 47.4% 11.2%)" },
-                        destructive: { DEFAULT: "hsl(0 84.2% 60.2%)", foreground: "hsl(210 40% 98%)" },
-                        muted: { DEFAULT: "hsl(210 40% 96.1%)", foreground: "hsl(215.4 16.3% 46.9%)" },
-                        accent: { DEFAULT: "hsl(210 40% 96.1%)", foreground: "hsl(222.2 47.4% 11.2%)" },
-                        card: { DEFAULT: "hsl(0 0% 100%)", foreground: "hsl(222.2 84% 4.9%)" },
-                    },
-                    borderRadius: { lg: "var(--radius)", md: "calc(var(--radius) - 2px)", sm: "calc(var(--radius) - 4px)" },
-                }
-            }
-        }
-    </script>
 </head>
 <body class="h-full bg-slate-50/50">
     <div id="root" class="h-full"></div>
 
     <script type="text/babel">
-        const { useState, useEffect, useMemo, useCallback } = React;
-        const { motion, AnimatePresence } = window.Motion;
+        const { useState, useEffect } = React;
+        const { motion } = window.Motion;
 
-        // --- Utils ---
-        const cn = (...args) => window.clsx(...args);
-        const generateId = () => Math.random().toString(36).substr(2, 9);
-        
-        // --- Storage Layer (Simulation of Prisma/DB) ---
+        // --- PASTE YOUR GOOGLE APPS SCRIPT URL HERE ---
+        const API_URL = "https://script.google.com/macros/s/AKfycbxHFpHijmbd_4qH3cgp5suJsRVVUiyRwDjUv9gbE29jC5Icsf0Cl9gK4HRfvYgFAk8M/exec";
+
         const Storage = {
-            get: (key) => JSON.parse(localStorage.getItem(`pf_${key}`)) || null,
-            set: (key, val) => localStorage.setItem(`pf_${key}`, JSON.stringify(val)),
-            
-            init: () => {
-                if (!Storage.get('users')) {
-                    Storage.set('users', [
-                        { id: 'u1', name: 'John Doe', email: 'john@doe.com', password: 'password', role: 'ADMIN' },
-                        { id: 'u2', name: 'Jane Smith', email: 'jane@example.com', password: 'password', role: 'MEMBER' }
-                    ]);
-                    Storage.set('projects', [
-                        { id: 'p1', name: 'Website Redesign', description: 'Modernizing corporate portal', color: '#7C3AED', ownerId: 'u1', updatedAt: new Date().toISOString() }
-                    ]);
-                    Storage.set('tasks', [
-                        { id: 't1', title: 'Draft mockups', status: 'DONE', priority: 'HIGH', projectId: 'p1', startDate: '2024-05-01', dueDate: '2024-05-10', creatorId: 'u1', assigneeId: 'u1' },
-                        { id: 't2', title: 'Implement tailwind', status: 'IN_PROGRESS', priority: 'MEDIUM', projectId: 'p1', startDate: '2024-05-12', dueDate: '2024-05-25', creatorId: 'u1', assigneeId: 'u2' }
-                    ]);
+            // New async function to get data from Google Sheets
+            init: async () => {
+                if (!API_URL.includes("http")) {
+                    console.error("Please provide a valid API URL from Google Apps Script.");
+                    return { users: [], projects: [], tasks: [] };
                 }
+                try {
+                    const response = await fetch(`${API_URL}?action=init`);
+                    return await response.json();
+                } catch (err) {
+                    console.error("Failed to connect to Google Sheets:", err);
+                    return { users: [], projects: [], tasks: [] };
+                }
+            },
+            
+            save: async (table, data) => {
+                // This would send a POST request to save back to the sheet
+                // Implementing this requires full POST handling in the GAS script
+                console.log(`Saving to ${table}:`, data);
             }
         };
 
-        // --- UI Primitives ---
-        const Icon = ({ name, size = 18, className }) => {
-            useEffect(() => { lucide.createIcons(); }, [name]);
-            return <i data-lucide={name} style={{ width: size, height: size }} className={className}></i>;
-        };
-
-        const Button = ({ children, variant = 'primary', size = 'md', className, ...props }) => {
-            const variants = {
-                primary: "bg-primary text-white hover:bg-primary/90 shadow-sm shadow-primary/20",
-                secondary: "bg-white border border-slate-200 text-slate-700 hover:bg-slate-50",
-                ghost: "text-slate-600 hover:bg-slate-100 hover:text-slate-900",
-                outline: "border border-slate-200 bg-transparent hover:bg-slate-50"
-            };
-            const sizes = { md: "h-10 px-4 py-2", sm: "h-8 px-3 text-xs", lg: "h-12 px-6 text-base", icon: "h-10 w-10 p-0" };
-            return (
-                <button 
-                    className={cn("inline-flex items-center justify-center rounded-lg font-medium transition-all active:scale-[0.98] disabled:opacity-50", variants[variant], sizes[size], className)}
-                    {...props}
-                >
-                    {children}
-                </button>
-            );
-        };
-
-        const Card = ({ children, className }) => (
-            <div className={cn("bg-white border border-slate-200 rounded-xl shadow-sm", className)}>{children}</div>
-        );
-
-        const Badge = ({ children, className, variant = 'default' }) => {
-            const variants = {
-                default: "bg-slate-100 text-slate-700",
-                primary: "bg-primary/10 text-primary",
-                success: "bg-emerald-50 text-emerald-700 border-emerald-100",
-                warning: "bg-amber-50 text-amber-700 border-amber-100",
-                error: "bg-rose-50 text-rose-700 border-rose-100"
-            };
-            return (
-                <span className={cn("px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border", variants[variant], className)}>
-                    {children}
-                </span>
-            );
-        };
-
-        // --- Custom Components ---
-        const GanttChart = ({ tasks, color }) => {
-            // Very simplified Gantt visualization for preview
-            const days = Array.from({ length: 30 }, (_, i) => i + 1);
-            return (
-                <div className="overflow-x-auto rounded-xl border bg-white p-4">
-                    <div className="min-w-[800px]">
-                        <div className="flex border-b pb-4 mb-4 font-bold text-[10px] text-slate-400 uppercase">
-                            <div className="w-48">Task</div>
-                            <div className="flex-1 flex gap-0.5">
-                                {days.map(d => <div key={d} className="flex-1 text-center border-l first:border-0">{d}</div>)}
-                            </div>
-                        </div>
-                        <div className="space-y-4 relative gantt-grid-lines py-2">
-                            {tasks.map((t, idx) => (
-                                <div key={t.id} className="flex items-center">
-                                    <div className="w-48 text-sm font-medium pr-4 truncate">{t.title}</div>
-                                    <div className="flex-1 h-8 relative">
-                                        <motion.div 
-                                            initial={{ width: 0 }}
-                                            animate={{ width: '40%' }}
-                                            className="absolute h-full rounded-lg flex items-center px-3 text-[10px] text-white font-bold"
-                                            style={{ left: `${idx * 15}%`, backgroundColor: color }}
-                                        >
-                                            {t.status}
-                                        </motion.div>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                </div>
-            );
-        };
-
-        // --- Views ---
-        const LoginView = ({ onLogin }) => {
-            const [email, setEmail] = useState('john@doe.com');
-            const [password, setPassword] = useState('password');
-            const [error, setError] = useState('');
-
-            const handleLogin = (e) => {
-                e.preventDefault();
-                const users = Storage.get('users');
-                const user = users.find(u => u.email === email && u.password === password);
-                if (user) {
-                    onLogin(user);
-                } else {
-                    setError('Invalid credentials');
-                }
-            };
-
-            return (
-                <div className="min-h-screen flex items-center justify-center p-4 hero-gradient">
-                    <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="w-full max-w-md">
-                        <Card className="p-8">
-                            <div className="flex flex-col items-center mb-8">
-                                <div className="w-12 h-12 bg-primary rounded-xl flex items-center justify-center text-white mb-4 shadow-lg shadow-primary/30">
-                                    <Icon name="folder-kanban" size={24} />
-                                </div>
-                                <h1 className="text-2xl font-bold tracking-tight">Welcome Back</h1>
-                                <p className="text-slate-500 text-sm mt-1">Sign in to manage your workflow</p>
-                            </div>
-
-                            <form onSubmit={handleLogin} className="space-y-4">
-                                <div>
-                                    <label className="text-xs font-bold uppercase text-slate-500 mb-1.5 block">Email Address</label>
-                                    <input 
-                                        type="email" 
-                                        className="w-full h-11 px-4 rounded-lg border border-slate-200 focus:ring-2 focus:ring-primary/20 outline-none transition-all"
-                                        value={email}
-                                        onChange={e => setEmail(e.target.value)}
-                                        required
-                                    />
-                                </div>
-                                <div>
-                                    <label className="text-xs font-bold uppercase text-slate-500 mb-1.5 block">Password</label>
-                                    <input 
-                                        type="password" 
-                                        className="w-full h-11 px-4 rounded-lg border border-slate-200 focus:ring-2 focus:ring-primary/20 outline-none transition-all"
-                                        value={password}
-                                        onChange={e => setPassword(e.target.value)}
-                                        required
-                                    />
-                                </div>
-                                {error && <p className="text-rose-500 text-xs font-medium text-center">{error}</p>}
-                                <Button type="submit" className="w-full h-11">Sign In</Button>
-                            </form>
-                            <p className="mt-6 text-center text-sm text-slate-500">
-                                Try <span className="font-bold text-primary">john@doe.com</span> / <span className="font-bold text-primary">password</span>
-                            </p>
-                        </Card>
-                    </motion.div>
-                </div>
-            );
-        };
-
-        const Dashboard = ({ projects, tasks }) => {
-            const stats = [
-                { label: 'Total Projects', value: projects.length, icon: 'folder', color: 'text-indigo-600', bg: 'bg-indigo-50' },
-                { label: 'Active Tasks', value: tasks.filter(t => t.status !== 'DONE').length, icon: 'clock', color: 'text-amber-600', bg: 'bg-amber-50' },
-                { label: 'Completed', value: tasks.filter(t => t.status === 'DONE').length, icon: 'check-circle', color: 'text-emerald-600', bg: 'bg-emerald-50' },
-                { label: 'Success Rate', value: '84%', icon: 'trending-up', color: 'text-blue-600', bg: 'bg-blue-50' }
-            ];
-
-            return (
-                <div className="space-y-8 max-w-6xl mx-auto">
-                    <div className="flex justify-between items-end">
-                        <div>
-                            <h2 className="text-3xl font-bold tracking-tight">Overview</h2>
-                            <p className="text-slate-500 mt-1">Status of your workspaces and team activity.</p>
-                        </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                        {stats.map((s, i) => (
-                            <Card key={i} className="p-5 flex justify-between items-center">
-                                <div>
-                                    <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">{s.label}</p>
-                                    <h3 className="text-2xl font-bold mt-1">{s.value}</h3>
-                                </div>
-                                <div className={cn("p-2.5 rounded-xl", s.bg, s.color)}>
-                                    <Icon name={s.icon} />
-                                </div>
-                            </Card>
-                        ))}
-                    </div>
-
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                        <Card className="p-6">
-                            <h3 className="font-bold text-lg mb-6 flex items-center gap-2">
-                                <Icon name="bar-chart-3" size={20} className="text-primary" />
-                                Project Health
-                            </h3>
-                            <div className="space-y-6">
-                                {projects.map(p => (
-                                    <div key={p.id} className="space-y-2">
-                                        <div className="flex justify-between text-sm">
-                                            <span className="font-semibold text-slate-700">{p.name}</span>
-                                            <span className="text-slate-500">65%</span>
-                                        </div>
-                                        <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
-                                            <div className="h-full bg-primary" style={{ width: '65%' }}></div>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        </Card>
-
-                        <Card className="p-6">
-                            <h3 className="font-bold text-lg mb-6 flex items-center gap-2">
-                                <Icon name="list-todo" size={20} className="text-primary" />
-                                Upcoming Deadlines
-                            </h3>
-                            <div className="space-y-3">
-                                {tasks.slice(0, 4).map(t => (
-                                    <div key={t.id} className="flex items-center justify-between p-3 border rounded-xl hover:bg-slate-50 transition-colors">
-                                        <div className="flex items-center gap-3">
-                                            <div className={cn("w-2 h-2 rounded-full", t.priority === 'HIGH' ? 'bg-rose-500' : 'bg-blue-500')}></div>
-                                            <div>
-                                                <p className="text-sm font-semibold">{t.title}</p>
-                                                <p className="text-[10px] text-slate-400">Due {t.dueDate}</p>
-                                            </div>
-                                        </div>
-                                        <Badge variant={t.status === 'DONE' ? 'success' : 'primary'}>{t.status}</Badge>
-                                    </div>
-                                ))}
-                            </div>
-                        </Card>
-                    </div>
-                </div>
-            );
-        };
-
-        const ProjectsView = ({ projects, onSelect }) => (
-            <div className="space-y-8 max-w-6xl mx-auto">
-                <div className="flex justify-between items-end">
-                    <div>
-                        <h2 className="text-3xl font-bold tracking-tight">Projects</h2>
-                        <p className="text-slate-500 mt-1">All your active workspaces in one place.</p>
-                    </div>
-                    <Button className="gap-2"><Icon name="plus" size={16} /> New Project</Button>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    {projects.map(p => (
-                        <Card key={p.id} className="group overflow-hidden cursor-pointer hover:shadow-lg transition-all border-t-4" style={{ borderTopColor: p.color }} onClick={() => onSelect(p)}>
-                            <div className="p-6">
-                                <div className="flex justify-between items-start mb-4">
-                                    <h3 className="text-xl font-bold group-hover:text-primary transition-colors">{p.name}</h3>
-                                    <Icon name="more-horizontal" size={16} className="text-slate-300" />
-                                </div>
-                                <p className="text-sm text-slate-500 line-clamp-2 mb-6">{p.description}</p>
-                                <div className="flex justify-between items-center text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                                    <span className="flex items-center gap-1.5"><Icon name="users" size={12}/> 3 Members</span>
-                                    <span className="flex items-center gap-1.5"><Icon name="calendar" size={12}/> Updated Today</span>
-                                </div>
-                            </div>
-                        </Card>
-                    ))}
-                </div>
-            </div>
-        );
-
-        const ProjectDetailView = ({ project, tasks, onBack }) => {
-            const [view, setView] = useState('kanban');
-            const projectTasks = tasks.filter(t => t.projectId === project.id);
-
-            return (
-                <div className="space-y-8 max-w-6xl mx-auto">
-                    <button onClick={onBack} className="flex items-center gap-2 text-slate-500 hover:text-primary transition-colors text-sm font-semibold">
-                        <Icon name="arrow-left" size={16} /> Back to Projects
-                    </button>
-
-                    <div className="flex justify-between items-start">
-                        <div>
-                            <div className="flex items-center gap-3 mb-2">
-                                <div className="w-3 h-3 rounded-full" style={{ backgroundColor: project.color }}></div>
-                                <h2 className="text-3xl font-bold tracking-tight">{project.name}</h2>
-                            </div>
-                            <p className="text-slate-500">{project.description}</p>
-                        </div>
-                        <div className="flex gap-2 bg-white border p-1 rounded-xl shadow-sm">
-                            {['kanban', 'list', 'gantt'].map(v => (
-                                <button 
-                                    key={v}
-                                    onClick={() => setView(v)}
-                                    className={cn("px-4 py-1.5 rounded-lg text-xs font-bold uppercase transition-all", view === v ? 'bg-primary text-white shadow-md' : 'text-slate-500 hover:bg-slate-50')}
-                                >
-                                    {v}
-                                </button>
-                            ))}
-                        </div>
-                    </div>
-
-                    <AnimatePresence mode="wait">
-                        <motion.div key={view} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}>
-                            {view === 'kanban' && (
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 h-[600px]">
-                                    {['TODO', 'IN_PROGRESS', 'DONE'].map(status => (
-                                        <div key={status} className="flex flex-col gap-4 bg-slate-100/50 p-4 rounded-2xl border border-slate-200">
-                                            <div className="flex justify-between items-center px-1">
-                                                <h4 className="text-xs font-bold uppercase tracking-widest text-slate-400">{status.replace('_', ' ')}</h4>
-                                                <span className="bg-white px-2 py-0.5 rounded text-[10px] font-bold border">{projectTasks.filter(t => t.status === status).length}</span>
-                                            </div>
-                                            <div className="flex flex-col gap-3 overflow-y-auto">
-                                                {projectTasks.filter(t => t.status === status).map(task => (
-                                                    <Card key={task.id} className="p-4 hover:shadow-md cursor-pointer border-l-4" style={{ borderLeftColor: project.color }}>
-                                                        <h5 className="text-sm font-bold mb-2">{task.title}</h5>
-                                                        <div className="flex justify-between items-center">
-                                                            <div className="w-6 h-6 rounded-full bg-slate-200 border border-white flex items-center justify-center text-[10px] font-bold text-slate-600">JD</div>
-                                                            <Badge variant={task.priority === 'HIGH' ? 'error' : 'warning'}>{task.priority}</Badge>
-                                                        </div>
-                                                    </Card>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
-                            {view === 'list' && (
-                                <Card className="overflow-hidden">
-                                    <table className="w-full text-left">
-                                        <thead className="bg-slate-50 border-b text-[10px] font-bold uppercase tracking-widest text-slate-400">
-                                            <tr>
-                                                <th className="px-6 py-4">Task Name</th>
-                                                <th className="px-6 py-4">Status</th>
-                                                <th className="px-6 py-4">Priority</th>
-                                                <th className="px-6 py-4">Assignee</th>
-                                                <th className="px-6 py-4">Due Date</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody className="divide-y">
-                                            {projectTasks.map(t => (
-                                                <tr key={t.id} className="hover:bg-slate-50 transition-colors">
-                                                    <td className="px-6 py-4 font-semibold text-sm">{t.title}</td>
-                                                    <td className="px-6 py-4"><Badge variant={t.status === 'DONE' ? 'success' : 'primary'}>{t.status}</Badge></td>
-                                                    <td className="px-6 py-4"><Badge variant={t.priority === 'HIGH' ? 'error' : 'warning'}>{t.priority}</Badge></td>
-                                                    <td className="px-6 py-4"><div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center text-[10px] font-bold text-primary">US</div></td>
-                                                    <td className="px-6 py-4 text-xs text-slate-500 font-medium">{t.dueDate}</td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
-                                </Card>
-                            )}
-                            {view === 'gantt' && <GanttChart tasks={projectTasks} color={project.color} />}
-                        </motion.div>
-                    </AnimatePresence>
-                </div>
-            );
-        };
-
-        // --- Root Shell ---
         const MainApp = () => {
+            const [isLoading, setIsLoading] = useState(true);
+            const [data, setData] = useState({ users: [], projects: [], tasks: [] });
             const [user, setUser] = useState(null);
-            const [activeTab, setActiveTab] = useState('dashboard');
-            const [selectedProject, setSelectedProject] = useState(null);
-            
-            // App State
-            const [projects, setProjects] = useState([]);
-            const [tasks, setTasks] = useState([]);
 
             useEffect(() => {
-                Storage.init();
-                setProjects(Storage.get('projects'));
-                setTasks(Storage.get('tasks'));
+                const loadData = async () => {
+                    const db = await Storage.init();
+                    setData(db);
+                    setIsLoading(false);
+                };
+                loadData();
             }, []);
 
-            if (!user) return <LoginView onLogin={setUser} />;
+            if (isLoading) {
+                return (
+                    <div className="h-screen flex items-center justify-center flex-col gap-4">
+                        <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
+                        <p className="text-slate-500 font-medium animate-pulse">Connecting to Google Sheets...</p>
+                    </div>
+                );
+            }
 
-            const sidebarItems = [
-                { id: 'dashboard', icon: 'layout-dashboard', label: 'Overview' },
-                { id: 'projects', icon: 'folder-kanban', label: 'Projects' },
-                { id: 'tasks', icon: 'check-circle', label: 'My Tasks' },
-                { id: 'admin', icon: 'shield-check', label: 'Admin', admin: true }
-            ];
+            // Simple login simulation based on Sheets data
+            if (!user) {
+                return (
+                    <div className="min-h-screen flex items-center justify-center hero-gradient p-4">
+                        <div className="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md border">
+                            <h1 className="text-2xl font-bold mb-6 text-center">ProjectFlow login</h1>
+                            <p className="text-sm text-slate-500 mb-6 text-center">Data is being fetched from your Google Sheet.</p>
+                            <button 
+                                onClick={() => setUser(data.users[0])}
+                                className="w-full bg-primary text-white h-11 rounded-lg font-bold shadow-lg shadow-primary/20"
+                            >
+                                Demo Login as {data.users[0]?.name || "User"}
+                            </button>
+                        </div>
+                    </div>
+                );
+            }
 
             return (
-                <div className="flex h-screen overflow-hidden">
-                    {/* Sidebar */}
-                    <aside className="w-64 border-r bg-white h-full flex flex-col p-4">
-                        <div className="flex items-center gap-3 px-3 py-6 mb-8 border-b">
-                            <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center text-white shadow-lg shadow-primary/30">
-                                <Icon name="folder-kanban" size={20} />
+                <div className="p-8">
+                    <h1 className="text-2xl font-bold">Connected to Google Sheets!</h1>
+                    <div className="mt-8 grid gap-4">
+                        <h2 className="font-bold text-slate-400 uppercase text-xs">Projects in Sheet:</h2>
+                        {data.projects.map(p => (
+                            <div key={p.id} className="p-4 bg-white border rounded-xl shadow-sm flex items-center gap-4">
+                                <div className="w-3 h-3 rounded-full" style={{backgroundColor: p.color}}></div>
+                                <span className="font-bold">{p.name}</span>
                             </div>
-                            <span className="font-bold text-lg tracking-tight">ProjectFlow</span>
-                        </div>
-                        <nav className="flex-1 flex flex-col gap-1">
-                            {sidebarItems.map(item => {
-                                if (item.admin && user.role !== 'ADMIN') return null;
-                                const isActive = activeTab === item.id;
-                                return (
-                                    <button 
-                                        key={item.id}
-                                        onClick={() => { setActiveTab(item.id); setSelectedProject(null); }}
-                                        className={cn("flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all font-medium text-sm", isActive ? "bg-primary text-white shadow-md shadow-primary/20" : "text-slate-500 hover:bg-slate-50 hover:text-slate-900")}
-                                    >
-                                        <Icon name={item.icon} size={18} />
-                                        {item.label}
-                                    </button>
-                                );
-                            })}
-                        </nav>
-                        <div className="mt-auto border-t pt-6 px-2">
-                            <div className="flex items-center gap-3 mb-6">
-                                <div className="w-9 h-9 rounded-full bg-slate-100 flex items-center justify-center font-bold text-xs">JD</div>
-                                <div className="flex-1 min-w-0">
-                                    <p className="text-sm font-bold truncate">{user.name}</p>
-                                    <p className="text-[10px] text-slate-400 truncate uppercase tracking-widest">{user.role}</p>
-                                </div>
-                            </div>
-                            <Button variant="outline" size="sm" className="w-full gap-2" onClick={() => setUser(null)}>
-                                <Icon name="log-out" size={14} /> Log Out
-                            </Button>
-                        </div>
-                    </aside>
-
-                    {/* Main Content */}
-                    <main className="flex-1 overflow-y-auto bg-slate-50/50 p-8 scroll-smooth">
-                        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.3 }}>
-                            {selectedProject ? (
-                                <ProjectDetailView 
-                                    project={selectedProject} 
-                                    tasks={tasks} 
-                                    onBack={() => setSelectedProject(null)} 
-                                />
-                            ) : (
-                                <>
-                                    {activeTab === 'dashboard' && <Dashboard projects={projects} tasks={tasks} />}
-                                    {activeTab === 'projects' && <ProjectsView projects={projects} onSelect={setSelectedProject} />}
-                                    {activeTab === 'tasks' && (
-                                        <div className="flex flex-col items-center justify-center h-[60vh] text-center max-w-sm mx-auto">
-                                            <Icon name="check-circle" size={48} className="text-slate-200 mb-4" />
-                                            <h3 className="text-xl font-bold">Personal Tasks</h3>
-                                            <p className="text-slate-500 text-sm mt-1">This section is currently being ported to the static version. Check back soon!</p>
-                                        </div>
-                                    )}
-                                    {activeTab === 'admin' && (
-                                        <div className="max-w-6xl mx-auto space-y-8">
-                                             <div className="flex justify-between items-end">
-                                                <div>
-                                                    <h2 className="text-3xl font-bold tracking-tight">System Admin</h2>
-                                                    <p className="text-slate-500 mt-1">Manage global user permissions and security.</p>
-                                                </div>
-                                            </div>
-                                            <Card className="p-6">
-                                                <h3 className="font-bold text-lg mb-6">Registered Users</h3>
-                                                <div className="space-y-4">
-                                                    {Storage.get('users').map(u => (
-                                                        <div key={u.id} className="flex justify-between items-center p-4 border rounded-xl">
-                                                            <div className="flex items-center gap-4">
-                                                                <div className="h-10 w-10 rounded-full bg-slate-100 flex items-center justify-center font-bold">
-                                                                    {u.name[0]}
-                                                                </div>
-                                                                <div>
-                                                                    <p className="text-sm font-bold">{u.name}</p>
-                                                                    <p className="text-xs text-slate-500">{u.email}</p>
-                                                                </div>
-                                                            </div>
-                                                            <Badge variant={u.role === 'ADMIN' ? 'error' : 'default'}>{u.role}</Badge>
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            </Card>
-                                        </div>
-                                    )}
-                                </>
-                            )}
-                        </motion.div>
-                    </main>
+                        ))}
+                    </div>
                 </div>
             );
         };
